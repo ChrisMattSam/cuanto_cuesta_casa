@@ -11,6 +11,7 @@ import pylab as plt
 import seaborn as sbn
 
 df = pd.read_csv('data/train.csv')
+df.set_index('Id', inplace = True)
 sbn.distplot(df.SalePrice/100000)
 
 'From intro stats lets check with the 68-95-99.7 rule with respect to 1-sd, 2-sd, 3-sd'
@@ -31,6 +32,14 @@ trim(df,1)
 trim(df,2)
 trim(df,3)
 
-"lets be conservative and take data within 3-sigma for now, but we'll adjust accordingly as needed later"
+'find the magnitude of correlation between continuous vars with a covariance matrix'
+abs_corr = df.select_dtypes(exclude = ['object']).drop(columns = 'SalePrice').corr().abs()
+'subset to those with |corr| in range [0.6,1) and decide which one to choose vs. drop'
+view = abs_corr[(abs_corr < 1) & (abs_corr >= .6)].dropna(1, 'all').dropna(0, 'all')
 
+ 
+    
+    
+    
 
+    
