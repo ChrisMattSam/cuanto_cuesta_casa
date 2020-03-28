@@ -9,29 +9,24 @@ import pandas as pd
 import numpy as np
 import pylab as plt
 from sklearn import linear_model as lm
+from sklearn.model_selection import cross_validate as cv
 import seaborn as sbn
 
-df = pd.read_csv('data/train.csv')
-t = df.select_dtypes(exclude = ['object']).isnull().sum() #return numerical features only
-x_train = df.loc[:, t.loc[t == 0].index].drop(columns = 'SalePrice')
+'Put the dataset together'
+df = pd.read_pickle('data/processed_df.pickle')
+x_train = df.drop(columns = 'SalePrice')
 y_train = df.SalePrice
 
-df_test = pd.read_csv('data/test.csv')
-x_test = df_test.loc[:, x_train.columns].dropna(axis = 0, how = 'any') # drop columns where any feature has an NA value
+x_test = pd.read_csv('data/test.csv').set_index('Id')[x_train.columns]
+y_test = pd.read_csv('data/sample_submission.csv').set_index('Id').iloc[:,0]
 
-mod = lm.LinearRegression(normalize = True).fit(x_train.drop(columns = 'Id'), y_train)
-print(mod.score(x_train.drop(columns = 'Id'), y_train)) # the R-squared (0<=R^2 <= 1), what pct of label's variability can be explained by the features
+X = pd.concat([x_train, x_test], axis = 0)
+y = pd.concat([y_train, y_test], axis = 0)
 
-y_actual = pd.read_csv('data/sample_submission.csv')
-y_actual = y_actual.loc[y_actual['Id'].isin(x_test.Id)]
-y_predicted = mod.predict(x_test.drop(columns = 'Id'))
-residuals = y_actual.SalePrice-y_predicted
-sbn.scatterplot(data = residuals)
+'For now lets subset the data on numerical features only'
+'Exclude subsequent elements with NAs for those features'
+X = X.select_dtypes(exclude = ['object']).dropna(0,'any')
+y = y.loc[y.index.isin(X.index)]
 
-
-plt.scatter(x_test.LotArea ,y_actual.SalePrice, color = 'k')
-plt.scatter(x_test.LotArea, y_predicted, color = 'g')
-plt.show()
-
-
-
+model_result = cv(lm.LinearRegression(normalize = True), X, y, cv = 20,
+                  scoring = 'r2')
