@@ -1,0 +1,32 @@
+3/29/20
+Christopher Sampah
+
+To-do:
+Check for duplicates based on Id
+Check for normality, correct for skewness and kurtosis
+MUST read paper published by the author of the dataset: http://jse.amstat.org/v19n3/decock.pdf
+Change numerical-type features that are truly categories( e.g. MSSubClass, MoSold)
+Look into ElasticNet regularization (uses both L1 and L2 penalty)
+
+Useful fxns:
+np.logp1
+sbn.pairplot(df_train, size = 2.5)
+
+Feature Engineering:
+Consider combining some features (e.g. # Total SF for house (incl. basement)
+= "GrLivArea" "TotalBsmtSF")
+When looking at the distro, note the skewness and kurtosis: 
+If skewness is less than -1 or greater than 1, the distribution is highly skewed.
+If skewness is between -1 and -0.5 or between 0.5 and 1, the distribution is moderately skewed.
+If skewness is between -0.5 and 0.5, the distribution is approximately symmetric.
+
+Kurtosis tells you the height and sharpness of the central peak, relative to that of a standard bell curve.
+
+
+From Pedro Marcelino:
+
+"Ok, 'SalePrice' is not normal. It shows 'peakedness', positive skewness and does not follow the diagonal line.
+But everything's not lost. A simple data transformation can solve the problem.
+This is one of the awesome things you can learn in statistical books: in case 
+of positive skewness, log transformations usually works well. When I discovered
+ this, I felt like an Hogwarts' student discovering a new cool spell."

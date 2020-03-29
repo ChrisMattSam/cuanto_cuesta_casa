@@ -96,4 +96,8 @@ if __name__ == '__main__':
     sbn.scatterplot('GrLivArea','2ndFlrSF', data = df)
 
     drop_cols.append('2ndFlrSF')
-
+    
+    plt.subplots(figsize=(16, 8))
+    fig = sbn.boxplot(x = 'YearBuilt', y="SalePrice", data=df)
+    fig.axis(ymin=0, ymax=800000);
+    plt.xticks(rotation=90);
