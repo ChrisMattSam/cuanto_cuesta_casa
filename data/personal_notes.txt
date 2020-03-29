@@ -2,9 +2,9 @@
 Christopher Sampah
 
 To-do:
+MUST read paper published by the author of the dataset: http://jse.amstat.org/v19n3/decock.pdf
 Check for duplicates based on Id
 Check for normality, correct for skewness and kurtosis
-MUST read paper published by the author of the dataset: http://jse.amstat.org/v19n3/decock.pdf
 Change numerical-type features that are truly categories( e.g. MSSubClass, MoSold)
 Look into ElasticNet regularization (uses both L1 and L2 penalty)
 
