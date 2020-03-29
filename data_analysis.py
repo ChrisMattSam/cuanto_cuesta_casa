@@ -7,7 +7,7 @@ Created on Sun Mar 22 11:20:38 2020
 
 import pandas as pd
 import seaborn as sbn
-
+import matplotlib.pyplot as plt
 
 def trim(df,std_dev=1, scale = False, return_df = False):
     '''
@@ -39,17 +39,31 @@ def abs_corr(df, drop_cols = [], min_val = .6, max_val = 1):
     abs_mtx = df.select_dtypes(exclude = ['object']).drop(columns = 'SalePrice').corr().abs()
     return abs_mtx[(abs_mtx < max_val) & (abs_mtx >= min_val)].dropna(1, 'all').dropna(0, 'all')
 
+def first_reg_prep(df):
+    '''
+    Data prep function as a result of the below analysis
+    '''
+    if 'Id' in df.columns:
+        df.set_index('Id', inplace = True)
+    
+    drop_cols = ['GarageYrBlt', 'BsmtFullBath', 'TotalBsmtSF', 'GarageCars', 'TotRmsAbvGrd', '2ndFlrSF']
+    df.drop(columns = drop_cols, inplace = True)
+    df = pd.concat([df,pd.get_dummies(df['OverallQual'], prefix = 'qual')],axis = 1)
+    return df
+    
 if __name__ == '__main__':
     
     df = pd.read_csv('data/train.csv')
     df.set_index('Id', inplace = True)
-    sbn.distplot(df.SalePrice/100000)
-
+    sbn.distplot(df.SalePrice/100000).set(xlabel = 'SalePrice (100k)')
+    plt.show()
+    
     sbn.distplot(df.SalePrice, kde_kws={"label": "All data"})
     trim(df,1)
     trim(df,2)
     trim(df,3)
-
+    plt.show()
+    
     df = trim(df,2,return_df = True)
 
     abs_corr(df)
@@ -82,5 +96,4 @@ if __name__ == '__main__':
     sbn.scatterplot('GrLivArea','2ndFlrSF', data = df)
 
     drop_cols.append('2ndFlrSF')
-    df.drop(columns = drop_cols, inplace = True)
-    df.to_pickle('data/processed_df.pickle')
+

@@ -11,13 +11,15 @@ import pylab as plt
 from sklearn import linear_model as lm
 from sklearn.model_selection import cross_validate as cv
 import seaborn as sbn
+from data_analysis import first_reg_prep
 
+'The first iteration, with purely numerical features'
 'Put the dataset together'
-df = pd.read_pickle('data/processed_df.pickle')
+df = first_reg_prep(pd.read_csv('data/train.csv'))
 x_train = df.drop(columns = 'SalePrice')
 y_train = df.SalePrice
 
-x_test = pd.read_csv('data/test.csv').set_index('Id')[x_train.columns]
+x_test = first_reg_prep(pd.read_csv('data/test.csv'))
 y_test = pd.read_csv('data/sample_submission.csv').set_index('Id').iloc[:,0]
 
 X = pd.concat([x_train, x_test], axis = 0)
@@ -29,4 +31,4 @@ X = X.select_dtypes(exclude = ['object']).dropna(0,'any')
 y = y.loc[y.index.isin(X.index)]
 
 model_result = cv(lm.LinearRegression(normalize = True), X, y, cv = 20,
-                  scoring = 'r2')
+                  scoring = 'r2', return_estimator = True)
