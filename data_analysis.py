@@ -6,8 +6,13 @@ Created on Sun Mar 22 11:20:38 2020
 """
 
 import pandas as pd
+import numpy as np
+import pylab as plt
+from sklearn import linear_model as lm
 import seaborn as sbn
 import matplotlib.pyplot as plt
+from scipy.stats import norm
+from scipy import stats
 
 def trim(df,std_dev=1, scale = False, return_df = False):
     '''
@@ -28,76 +33,87 @@ def trim(df,std_dev=1, scale = False, return_df = False):
         label = str(std_dev) + "-Sigma, " + str(round(100*data.shape[0]/df.SalePrice.shape[0],2)) + "% of dataset"
         sbn.distplot(data/scale, kde_kws = {"label": label})
 
-def abs_corr(df, drop_cols = [], min_val = .6, max_val = 1):
-    '''
-    Calculates the pair-wise correlation between features, takes the absolute 
-    value of it, then displays the values in matrix form.
-    '''
+def abs_corr(df, drop_cols = [], min_val = .6, max_val = 1, plot_me = True, plot_x = 12, plot_y = 9):
     if len(drop_cols) > 0:
         drop_cols = list(set(drop_cols))
         df = df[[i for i in df.columns if i not in drop_cols]]
     abs_mtx = df.select_dtypes(exclude = ['object']).drop(columns = 'SalePrice').corr().abs()
-    return abs_mtx[(abs_mtx < max_val) & (abs_mtx >= min_val)].dropna(1, 'all').dropna(0, 'all')
+    
+    mtx = abs_mtx[(abs_mtx < max_val) & (abs_mtx >= min_val)].dropna(1, 'all').dropna(0, 'all')
+    if plot_me:
+        plt.subplots(figsize=(plot_x, plot_y))
+        sbn.heatmap(mtx, vmax=.8, square=True)
+    else:
+        return mtx
 
-def first_reg_prep(df):
-    '''
-    Data prep function as a result of the below analysis
-    '''
-    if 'Id' in df.columns:
-        df.set_index('Id', inplace = True)
-    
-    drop_cols = ['GarageYrBlt', 'BsmtFullBath', 'TotalBsmtSF', 'GarageCars', 'TotRmsAbvGrd', '2ndFlrSF']
-    df.drop(columns = drop_cols, inplace = True)
-    df = pd.concat([df,pd.get_dummies(df['OverallQual'], prefix = 'qual')],axis = 1)
-    return df
-    
-if __name__ == '__main__':
-    
-    df = pd.read_csv('data/train.csv')
-    df.set_index('Id', inplace = True)
-    sbn.distplot(df.SalePrice/100000).set(xlabel = 'SalePrice (100k)')
+def check_skew_kurtosis(df, feature = 'SalePrice', pics_only = False,):
+    y = df[feature]
+    sbn.distplot(y, fit=norm)
+    plt.figure()
+    stats.probplot(y, plot=plt)
     plt.show()
+    print('The kurtosis: ' + str(stats.kurtosis(y)))
+    print('The skew: ' + str(stats.skew(y)))
     
-    sbn.distplot(df.SalePrice, kde_kws={"label": "All data"})
-    trim(df,1)
-    trim(df,2)
-    trim(df,3)
-    plt.show()
+#if __name__ == '__main__':
+
+df = pd.read_csv('data/train.csv')
+df.set_index('Id', inplace = True)
+
+# Initial outlier detection, check the 68-95-99.7 rule, alter the df accordingly
+sbn.distplot(df.SalePrice/100000).set(xlabel = 'SalePrice (100k)')
+plt.show()
+
+sbn.distplot(df.SalePrice, kde_kws={"label": "All data"})
+trim(df,1)
+trim(df,2)
+trim(df,3)
+plt.show()
+
+df = trim(df,2,return_df = True)
+
+# First try with numerical features only:
+abs_corr(df)
+# Lets examine further the relationship between GarageYrBlt and [YearBuilt, YearRemodAdd]
+sbn.scatterplot('YearBuilt', 'GarageYrBlt',data = df)
+plt.show()
+print(df.loc[df['YearBuilt'] > df['GarageYrBlt'],['YearBuilt','GarageYrBlt']])
+sbn.scatterplot('GarageYrBlt', 'YearRemodAdd',data = df)
+plt.show()
+# See notebook for rationale in picking these features to drop
+drop_cols = ['GarageYrBlt','TotalBsmtSF','GarageCars','TotRmsAbvGrd']
+abs_corr(df, drop_cols, plot_x = 10, plot_y = 7)
+sbn.scatterplot('GrLivArea','2ndFlrSF', data = df)
+plt.show()
+df.drop(columns = drop_cols, inplace = True)
+
+'Feature engineering and prep'
+def reg_prep(df):
+    for col in df.select_dtypes(exclude = ['object']):
+        if col not in ['YrSold', 'PoolArea'] and len(df[col].unique()) < 12:
+            print('The col to be dummied is ' + col)
+            #print(pd.get_dummies(df[col],prefix = col))
+            df = pd.concat([df.drop(columns = col),pd.get_dummies(df[col],prefix = col)], axis = 1)
+        return df.select_dtypes(exclude = ['object'])
+y = pd.concat([df['SalePrice'].to_frame(), pd.read_csv('data/sample_submission.csv').set_index('Id')])
+
+test = pd.read_csv('data/test.csv').set_index('Id')
+df.drop(columns = 'SalePrice', inplace = True)
+X = reg_prep(pd.concat([df,test[df.columns]]))
+#X.isnull().sum().sort_values(ascending = False)
+X.drop(columns = ['LotFrontage','MasVnrArea'], inplace = True)
+X.dropna(how = 'any', inplace = True)
+continuous = ['LotArea', 'BsmtFinSF1', 'BsmtFinSF2', 'BsmtUnfSF', '1stFlrSF','2ndFlrSF','LowQualFinSF','GrLivArea','GarageArea',
+              'WoodDeckSF', 'OpenPorchSF', 'EnclosedPorch','3SsnPorch','ScreenPorch', 'PoolArea', 'YearBuilt', 'MiscVal']
+
+for col in continuous:
+    X[col] = (X[col] - X[col].mean())/X[col].std()
+
+dummies = [pd.get_dummies(X[categorical], prefix = categorical) for categorical in [i for i in X.columns if i not in continuous] ]
+pd.concat(dummies,1)
+
+
+
     
-    df = trim(df,2,return_df = True)
 
-    abs_corr(df)
-    # Lets examine further the relationship between GarageYrBlt and [YearBuilt, YearRemodAdd]
-    sbn.scatterplot('YearBuilt', 'GarageYrBlt',data = df)
-    print(df.loc[df['YearBuilt'] > df['GarageYrBlt'],['YearBuilt','GarageYrBlt']])
-    sbn.scatterplot('GarageYrBlt', 'YearRemodAdd',data = df)
-    # Because GarageYrBlt is correlated with two other features, and its relevant data still seems to be captured by the other two features, we drop it from our dataset
-    drop_cols = ['GarageYrBlt']
-    df.BsmtFullBath.value_counts()
-    # Next we'll get rid of feature BsmtFullBath because its correlated with BsmtFinSF1 and is less informative, and 
-    # because its categorical it'd require the creation of more features (e.g. dummy variables)
-    drop_cols.append('BsmtFullBath')
 
-    # Next we look at basement square feet and 1st floor sq feet
-    print(df.loc[(df['TotalBsmtSF'] == 0) & (df['1stFlrSF'] > 0)].shape)
-    print(df.loc[(df['TotalBsmtSF'] > 0) & (df['1stFlrSF'] == 0)].shape)
-    print(df.loc[df['TotalBsmtSF'] > df['1stFlrSF'],['TotalBsmtSF','1stFlrSF'] ])
-    print('\nLets check for houses without first floors nor basements:')
-    print(df.loc[df['1stFlrSF']==0].shape)
-    print(df.loc[df['TotalBsmtSF']==0].shape)
-
-    drop_cols.append('TotalBsmtSF')
-    abs_corr(df, drop_cols)
-
-    [drop_cols.append(i) for i in ['GarageCars','TotRmsAbvGrd']]
-    abs_corr(df, drop_cols)
-
-    # Lets take a closer look between general living area and 2nd floor square feet: 
-    sbn.scatterplot('GrLivArea','2ndFlrSF', data = df)
-
-    drop_cols.append('2ndFlrSF')
-    
-    plt.subplots(figsize=(16, 8))
-    fig = sbn.boxplot(x = 'YearBuilt', y="SalePrice", data=df)
-    fig.axis(ymin=0, ymax=800000);
-    plt.xticks(rotation=90);
