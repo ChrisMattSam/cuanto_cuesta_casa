@@ -41,6 +41,7 @@ def abs_corr(df, drop_cols = [], min_val = .6, max_val = 1, plot_me = True, plot
     if plot_me:
         plt.subplots(figsize=(plot_x, plot_y))
         sbn.heatmap(mtx, vmax=.8, square=True)
+        plt.show()
     else:
         return mtx
 
@@ -113,34 +114,67 @@ may drop one of them depending on model performance
 """
 df.drop(columns = drop_cols, inplace = True)
 
-'Feature engineering and final data prep'
+'Feature engineering and final data prep:'
 # consolidate date vars
+from operator import attrgetter
 df.rename(columns = {'YrSold': 'year','MoSold':'month'}, inplace = True)
 df['day'] = 1
-df['date_sold'] = pd.to_datetime(df[['year', 'month','day']]).dt.to_period('M')
-[df.drop(columns = date_col, inplace = True) for date_col in ['year', 'month', 'day']]
+df['date_sold'] = pd.to_datetime(df[['year', 'month','day']])
+df['min_sell_date'] = df.date_sold.min()
+min_sell_date = df['min_sell_date'].iloc[0]
+df['months_since_sold'] = (df.date_sold.dt.to_period('M') - df.min_sell_date.dt.to_period('M')).apply(attrgetter('n'))
+[df.drop(columns = date_col, inplace = True) for date_col in ['year', 'month',
+ 'day', 'date_sold', 'min_sell_date']]
+df['months_since_sold'].hist() # a quick histogram
+plt.show()
 df.corrwith(df.SalePrice).sort_values()
 
+# fill missing vals
+df.isnull().sum()
+for feature in ['BsmtFullBath','BsmtHalfBath','BsmtFinSF1','BsmtFinSF2','BsmtUnfSF','GarageArea']:
+    print('Row of missing values for feature ' + feature+ ':')
+    print(df.loc[df[feature].isna()])
+    print('\n')
 
+'''
+Looking at the data, the record at indices 2121 and 2189 are missing values for all basement-related features,
+so I presume this means there doesnt exist a basement. Impute accordingly
+'''
+df.loc[df.index.isin([2121, 2189]),['BsmtFullBath', 'BsmtHalfBath']] = 0
+df.loc[df.index == 2121, ['BsmtFinSF1','BsmtFinSF2','BsmtUnfSF']] = 0
+df.loc[df['GarageArea'].isna(),['GarageArea']] = 0
+df.isnull().sum()
+
+'normalize'
+df = df.sample(frac = 1) #shuffle in case the data came in an ordered manner
+X = df.drop(columns = ['SalePrice','log_SalePrice'])
+X = (X - X.mean())/X.std()
+y = df['SalePrice']
+
+'Modelling:'
 from sklearn import linear_model as lm
 from sklearn.model_selection import cross_validate as cv
-m = cv(lm.LinearRegression(fit_intercept = False), X, y, cv = 20,
+
+baseline = cv(lm.LinearRegression(fit_intercept = True), X, y, cv = 20,
                   scoring = 'r2', return_estimator = True)
 
-'Find the best test score, positive number closest to zero'
-print(m['test_score'])
-'corresponds to index = 8'
-best_model = m['estimator'][8]
-print(best_model.coef_.min())
-print(best_model.coef_.max())
+print('Multiple Regression:')
+print('Largest R-squared: ' +  str(baseline['test_score'].max()))
 
-for penalty in [10,11,12,13,14,15,16,17,18,19,20]:
-    ridger = cv(lm.Ridge(alpha = penalty, fit_intercept = False), X, y, scoring = 'r2',cv = 10, return_estimator = True)
+print('Ridge regression for multiple penalty terms:')
+for penalty in list(range(1,21)):
+    ridger = cv(lm.Ridge(alpha = penalty), X, y, scoring = 'r2',cv = 10, return_estimator = True)
     r = [ round(i,3) for i in ridger['test_score'] ]
-    print(r)
-
-lass= cv(lm.Lasso(alpha = 1, max_iter = 5000), X, y, scoring = 'r2',cv = 10, return_estimator = True)
-r = [ round(i,3) for i in lass['test_score'] ]
-print(r)
+    print('Penalty: ' + str(penalty))
+    print('Smallest R-squared: ' + str(min(r)))
+    print('Largest R-squared: ' + str(max(r)) + '\n')
+print('Lasso regression for multiple penalty terms:' )
+for penalty in list(range(1,3)):
+    lasso = cv(lm.Lasso(alpha = penalty, max_iter = 5000), X, y, scoring = 'r2',cv = 10, return_estimator = True)
+    r = [ round(i,3) for i in lasso['test_score'] ]
+    print('Penalty: ' + str(penalty))
+    print('Smallest R-squared: ' + str(min(r)))
+    print('Largest R-squared: ' + str(max(r)))
+    
 
 
