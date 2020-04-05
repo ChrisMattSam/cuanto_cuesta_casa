@@ -154,6 +154,9 @@ y = df['SalePrice']
 'Modelling:'
 from sklearn import linear_model as lm
 from sklearn.model_selection import cross_validate as cv
+import warnings
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")# lasso generates a lot of warnings
 
 baseline = cv(lm.LinearRegression(fit_intercept = True), X, y, cv = 20,
                   scoring = 'r2', return_estimator = True)
@@ -169,7 +172,7 @@ for penalty in list(range(1,21)):
     print('Smallest R-squared: ' + str(min(r)))
     print('Largest R-squared: ' + str(max(r)) + '\n')
 print('Lasso regression for multiple penalty terms:' )
-for penalty in list(range(1,3)):
+for penalty in list(range(1,21)):
     lasso = cv(lm.Lasso(alpha = penalty, max_iter = 5000), X, y, scoring = 'r2',cv = 10, return_estimator = True)
     r = [ round(i,3) for i in lasso['test_score'] ]
     print('Penalty: ' + str(penalty))
