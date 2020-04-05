@@ -8,7 +8,6 @@ Created on Sun Mar 22 11:20:38 2020
 import pandas as pd
 import numpy as np
 import pylab as plt
-from sklearn import linear_model as lm
 import seaborn as sbn
 import matplotlib.pyplot as plt
 from scipy.stats import norm
@@ -110,10 +109,31 @@ for col in continuous:
     X[col] = (X[col] - X[col].mean())/X[col].std()
 
 dummies = [pd.get_dummies(X[categorical], prefix = categorical) for categorical in [i for i in X.columns if i not in continuous] ]
-pd.concat(dummies,1)
+dummies.append(X)
+
+X = pd.concat(dummies,1)
+y = y.loc[y.index.isin(X.index)]
 
 
+from sklearn import linear_model as lm
+from sklearn.model_selection import cross_validate as cv
+m = cv(lm.LinearRegression(fit_intercept = False), X, y, cv = 20,
+                  scoring = 'r2', return_estimator = True)
 
-    
+'Find the best test score, positive number closest to zero'
+print(m['test_score'])
+'corresponds to index = 8'
+best_model = m['estimator'][8]
+print(best_model.coef_.min())
+print(best_model.coef_.max())
+
+for penalty in [10,11,12,13,14,15,16,17,18,19,20]:
+    ridger = cv(lm.Ridge(alpha = penalty, fit_intercept = False), X, y, scoring = 'r2',cv = 10, return_estimator = True)
+    r = [ round(i,3) for i in ridger['test_score'] ]
+    print(r)
+
+lass= cv(lm.Lasso(alpha = 1, max_iter = 5000), X, y, scoring = 'r2',cv = 10, return_estimator = True)
+r = [ round(i,3) for i in lass['test_score'] ]
+print(r)
 
 
