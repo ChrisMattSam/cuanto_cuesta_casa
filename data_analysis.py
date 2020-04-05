@@ -7,12 +7,11 @@ Created on Sun Mar 22 11:20:38 2020
 
 import pandas as pd
 import numpy as np
-import pylab as plt
 import seaborn as sbn
 import matplotlib.pyplot as plt
 from scipy.stats import norm
 from scipy import stats
-
+    
 def trim(df,std_dev=1, scale = False, return_df = False):
     '''
     From intro stats, check the 68-95-99.7 rule with respect to 1-sd, 2-sd,
@@ -31,12 +30,12 @@ def trim(df,std_dev=1, scale = False, return_df = False):
     else:
         label = str(std_dev) + "-Sigma, " + str(round(100*data.shape[0]/df.SalePrice.shape[0],2)) + "% of dataset"
         sbn.distplot(data/scale, kde_kws = {"label": label})
-
+    
 def abs_corr(df, drop_cols = [], min_val = .6, max_val = 1, plot_me = True, plot_x = 12, plot_y = 9):
     if len(drop_cols) > 0:
         drop_cols = list(set(drop_cols))
         df = df[[i for i in df.columns if i not in drop_cols]]
-    abs_mtx = df.select_dtypes(exclude = ['object']).drop(columns = 'SalePrice').corr().abs()
+    abs_mtx = df.drop(columns = 'SalePrice').corr().abs()
     
     mtx = abs_mtx[(abs_mtx < max_val) & (abs_mtx >= min_val)].dropna(1, 'all').dropna(0, 'all')
     if plot_me:
@@ -54,65 +53,73 @@ def check_skew_kurtosis(df, feature = 'SalePrice', pics_only = False,):
     print('The kurtosis: ' + str(stats.kurtosis(y)))
     print('The skew: ' + str(stats.skew(y)))
     
-#if __name__ == '__main__':
+    
+'Initial outlier detection:'
+df =  pd.read_csv('data/train.csv').set_index('Id')
+df_test = pd.concat([pd.read_csv('data/test.csv').set_index('Id'),
+                    pd.read_csv('data/sample_submission.csv').set_index('Id')],1)
+df = pd.concat([df, df_test])
 
-df = pd.read_csv('data/train.csv')
-df.set_index('Id', inplace = True)
+print(df.SalePrice.describe())
 
-# Initial outlier detection, check the 68-95-99.7 rule, alter the df accordingly
-sbn.distplot(df.SalePrice/100000).set(xlabel = 'SalePrice (100k)')
+# check the 68-95-99.7 rule, alter the df accordingly
+sbn.distplot(df.SalePrice/100000, kde_kws={"label": "Original data"})
+trim(df,1,True)
+trim(df,2,True)
+trim(df,3,True)
+plt.title('Scaled Standard Deviations')
 plt.show()
 
-sbn.distplot(df.SalePrice, kde_kws={"label": "All data"})
-trim(df,1)
-trim(df,2)
-trim(df,3)
-plt.show()
+'Notice the large peak. Check skew and kurtosis'
+check_skew_kurtosis(df)
+df['log_SalePrice'] = np.log(df['SalePrice'])
+check_skew_kurtosis(df,'log_SalePrice')
+# from the article (https://www.spcforexcel.com/knowledge/basic-statistics/are-skewness-and-kurtosis-useful-statistics)
+# skewness and kurtosis arent that useful, so may try regression with both logged and unlogged SalePrice
 
+# trim the data based on the graphics, come back and attempt regression without
+# removing outlier but log SalePrice
 df = trim(df,2,return_df = True)
 
-# First try with numerical features only:
-abs_corr(df)
-# Lets examine further the relationship between GarageYrBlt and [YearBuilt, YearRemodAdd]
-sbn.scatterplot('YearBuilt', 'GarageYrBlt',data = df)
-plt.show()
-print(df.loc[df['YearBuilt'] > df['GarageYrBlt'],['YearBuilt','GarageYrBlt']])
-sbn.scatterplot('GarageYrBlt', 'YearRemodAdd',data = df)
-plt.show()
-# See notebook for rationale in picking these features to drop
-drop_cols = ['GarageYrBlt','TotalBsmtSF','GarageCars','TotRmsAbvGrd']
-abs_corr(df, drop_cols, plot_x = 10, plot_y = 7)
-sbn.scatterplot('GrLivArea','2ndFlrSF', data = df)
-plt.show()
+'Feature selection for modelling: continuous vars, date-vars, and counts only'
+print(df.select_dtypes(exclude = ['object']).head())
+for i in df.select_dtypes(exclude = ['object']).columns:
+    print('The feature: ' + i)
+    print(df[i].value_counts(dropna = False))
+    print('\n')
+
+drop_cols = list(df.select_dtypes(exclude = ['number']).columns)
+[drop_cols.append(col) for col in ['MSSubClass','OverallQual','OverallCond', 'MiscVal']]
+
+'quick cleaning:'
+df['LotFrontage'].replace(np.nan,0, inplace = True)
+df['MasVnrArea'].replace(np.nan,0, inplace = True)
+
+abs_corr(df.drop(columns = 'log_SalePrice'), drop_cols)
+'''
+1st floor sq feet and basement sq feet highly correlated. Sometimes the 1st floor can be the square feet,
+and not all houses have a basement t.f. drop total bsmt sq feet.
+Also, garage cars highly correlates with garage area, and is less informative.
+Year built correlates strongly with garage's year built, and is more informative.
+Total rooms above ground highly correlates with general living area, and is less informative, and seems
+to be captured by living area as well as bedrooms above ground
+'''
+[drop_cols.append(i) for i in ['GarageYrBlt', 'GarageCars','TotalBsmtSF', 'TotRmsAbvGrd']]
+abs_corr(df.drop(columns = 'log_SalePrice'), drop_cols)
+"""
+The remaining correlations arent as strong, but we note 2nd floor square feet and general living
+area. I'll leave for now since I find them both to be informative for different reasons, but 
+may drop one of them depending on model performance
+"""
 df.drop(columns = drop_cols, inplace = True)
 
-'Feature engineering and prep'
-def reg_prep(df):
-    for col in df.select_dtypes(exclude = ['object']):
-        if col not in ['YrSold', 'PoolArea'] and len(df[col].unique()) < 12:
-            print('The col to be dummied is ' + col)
-            #print(pd.get_dummies(df[col],prefix = col))
-            df = pd.concat([df.drop(columns = col),pd.get_dummies(df[col],prefix = col)], axis = 1)
-        return df.select_dtypes(exclude = ['object'])
-y = pd.concat([df['SalePrice'].to_frame(), pd.read_csv('data/sample_submission.csv').set_index('Id')])
-
-test = pd.read_csv('data/test.csv').set_index('Id')
-df.drop(columns = 'SalePrice', inplace = True)
-X = reg_prep(pd.concat([df,test[df.columns]]))
-#X.isnull().sum().sort_values(ascending = False)
-X.drop(columns = ['LotFrontage','MasVnrArea'], inplace = True)
-X.dropna(how = 'any', inplace = True)
-continuous = ['LotArea', 'BsmtFinSF1', 'BsmtFinSF2', 'BsmtUnfSF', '1stFlrSF','2ndFlrSF','LowQualFinSF','GrLivArea','GarageArea',
-              'WoodDeckSF', 'OpenPorchSF', 'EnclosedPorch','3SsnPorch','ScreenPorch', 'PoolArea', 'YearBuilt', 'MiscVal']
-
-for col in continuous:
-    X[col] = (X[col] - X[col].mean())/X[col].std()
-
-dummies = [pd.get_dummies(X[categorical], prefix = categorical) for categorical in [i for i in X.columns if i not in continuous] ]
-dummies.append(X)
-
-X = pd.concat(dummies,1)
-y = y.loc[y.index.isin(X.index)]
+'Feature engineering and final data prep'
+# consolidate date vars
+df.rename(columns = {'YrSold': 'year','MoSold':'month'}, inplace = True)
+df['day'] = 1
+df['date_sold'] = pd.to_datetime(df[['year', 'month','day']]).dt.to_period('M')
+[df.drop(columns = date_col, inplace = True) for date_col in ['year', 'month', 'day']]
+df.corrwith(df.SalePrice).sort_values()
 
 
 from sklearn import linear_model as lm
