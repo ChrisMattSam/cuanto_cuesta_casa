@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sun Mar 22 11:20:38 2020
-
 @author: christopher_sampah
+
+Referenced Kaggle notebook https://www.kaggle.com/pmarcelino/comprehensive-data-exploration-with-python
+primarily used the correlation matrix idea and examined skewness & kurtosis b/c of its use (although didnt use
+the results of it in the script)
 """
 
 import pandas as pd
