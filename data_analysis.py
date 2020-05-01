@@ -158,39 +158,30 @@ y = df['SalePrice']
 'Modelling:'
 from sklearn import linear_model as lm
 from sklearn.model_selection import cross_validate as cv
-import warnings
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")# lasso generates a lot of warnings
 
 baseline = cv(lm.LinearRegression(fit_intercept = True), X, y, cv = 20,
                   scoring = 'r2', return_estimator = True)
 
 print('Multiple Regression:')
-print('Largest R-squared: ' +  str(baseline['test_score'].max()))
+print('Largest R-squared: ' +  str(baseline['test_score'].max()) + '\n')
 
-ridge_vals = {'penalty':list(range(1,21)), 'smallest':list(), 'largest':list() }
-for penalty in ridge_vals['penalty']:
+# regularize
+reg_vals = {'penalty':list(range(1,21)), 'Ridge':list(), 'Lasso':list() }
+
+for penalty in reg_vals['penalty']:
     ridger = cv(lm.Ridge(alpha = penalty), X, y, scoring = 'r2',cv = 10, return_estimator = True)
     r = [ round(i,3) for i in ridger['test_score'] ]
-    
-    ridge_vals['smallest'].append(min(r))
-    ridge_vals['largest'].append(max(r))
-    
-    
-min_r = min(ridge_vals['smallest'])
-max_r = max(ridge_vals['largest'])
+    reg_vals['Ridge'].append(max(r))
 
-print('Ridge regression for multiple penalty terms:')
-print('Smallest R-squared: ' + str(min_r) + ' with corresponding alpha ' + str( ridge_vals['penalty'][ridge_vals['smallest'].index(min_r)] ))
-print('Largest R-squared: ' + str(max_r) + ' with corresponding alpha ' + str( ridge_vals['largest'].index(max_r) ))
-
-print('Lasso regression for multiple penalty terms:' )
-for penalty in list(range(1,21)):
-    lasso = cv(lm.Lasso(alpha = penalty, max_iter = 5000), X, y, scoring = 'r2',cv = 10, return_estimator = True)
-    r = [ round(i,3) for i in lasso['test_score'] ]
-    print('Penalty: ' + str(penalty))
-    print('Smallest R-squared: ' + str(min(r)))
-    print('Largest R-squared: ' + str(max(r)))
+for penalty in reg_vals['penalty']:
+    lasso = cv(lm.Lasso(alpha = penalty, max_iter = 50000), X, y, scoring = 'r2',cv = 10, return_estimator = True)
+    r = [ round(i,3) for i in lasso['test_score']]
+    reg_vals['Lasso'].append(max(r))
     
-
-
+for val in ['Ridge', 'Lasso']:
+    v = max(reg_vals[val])
+    print(val + ' Regression:')
+    print('Largest R-squared: '+ str(v) + ' for corresponding alpha = ' +
+          str( reg_vals['penalty'][reg_vals[val].index(v)]) + '\n')
+          
+          
