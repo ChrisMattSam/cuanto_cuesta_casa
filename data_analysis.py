@@ -46,6 +46,10 @@ def abs_corr(df, drop_cols = [], min_val = .6, max_val = 1, plot_me = True, plot
         return mtx
 
 def check_skew_kurtosis(df, feature = 'SalePrice', pics_only = False,):
+    '''
+    Overlay a normal pdf onto the plot of the feature of interest to visually
+    observe its deviation from normality
+    '''
     y = df[feature]
     sbn.distplot(y, fit=norm)
     plt.figure()
@@ -164,13 +168,22 @@ baseline = cv(lm.LinearRegression(fit_intercept = True), X, y, cv = 20,
 print('Multiple Regression:')
 print('Largest R-squared: ' +  str(baseline['test_score'].max()))
 
-print('Ridge regression for multiple penalty terms:')
-for penalty in list(range(1,21)):
+ridge_vals = {'penalty':list(range(1,21)), 'smallest':list(), 'largest':list() }
+for penalty in ridge_vals['penalty']:
     ridger = cv(lm.Ridge(alpha = penalty), X, y, scoring = 'r2',cv = 10, return_estimator = True)
     r = [ round(i,3) for i in ridger['test_score'] ]
-    print('Penalty: ' + str(penalty))
-    print('Smallest R-squared: ' + str(min(r)))
-    print('Largest R-squared: ' + str(max(r)) + '\n')
+    
+    ridge_vals['smallest'].append(min(r))
+    ridge_vals['largest'].append(max(r))
+    
+    
+min_r = min(ridge_vals['smallest'])
+max_r = max(ridge_vals['largest'])
+
+print('Ridge regression for multiple penalty terms:')
+print('Smallest R-squared: ' + str(min_r) + ' with corresponding alpha ' + str( ridge_vals['penalty'][ridge_vals['smallest'].index(min_r)] ))
+print('Largest R-squared: ' + str(max_r) + ' with corresponding alpha ' + str( ridge_vals['largest'].index(max_r) ))
+
 print('Lasso regression for multiple penalty terms:' )
 for penalty in list(range(1,21)):
     lasso = cv(lm.Lasso(alpha = penalty, max_iter = 5000), X, y, scoring = 'r2',cv = 10, return_estimator = True)
