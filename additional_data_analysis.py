@@ -53,6 +53,7 @@ def continuous_vars_prep(df, numeric_cols):
     drop_cols = [i for i in df.columns if i in df_first.columns]
     df_first.drop(columns = drop_cols, inplace = True)
     df = df.merge(df_first, right_index = True, left_index = True)
+    df.drop(columns = ['MoSold', 'YrSold'], inplace = True)
     if numeric_cols:
         return df, num_cols
     else:
@@ -62,9 +63,12 @@ d1 =  pd.read_csv('data/train.csv').set_index('Id')
 d2 = pd.concat([pd.read_csv('data/test.csv').set_index('Id'),
                     pd.read_csv('data/sample_submission.csv').set_index('Id')],1)
 df, numeric_cols = continuous_vars_prep(pd.concat([d1, d2]), True)
-
+#delete redundant features that we got rid of in the first pass:
+df.drop(columns = ['TotalBsmtSF', 'TotRmsAbvGrd','YearBuilt', 'GarageYrBlt', 'GarageCars','MiscVal'],
+        inplace = True)
 '''
-Lets bring back the ordinal categoricals
+Lets bring back the ordinal categoricals, deleting features that have to do with
+the date
 '''
 
 df = df.select_dtypes(exclude = ['object'])
@@ -72,23 +76,39 @@ ordinals = [i for i in df.columns if i not in numeric_cols]
 print(df[ordinals].head())
 
 'Lets start with MSSubClass, OverallCond, and OverallQual which identifies the type of dwelling involved in the sale.'
-sbn.scatterplot(x = 'MSSubClass', y = 'SalePrice', data = df)
-plt.show()
-
-'''No immediate discernable pattern, and idk how this attribute affects housing 
-prices. OverallQual and OverallCond are  so just make each category its own indicator var'''
-df = pd.get_dummies(df,columns = ['MSSubClass'], prefix = 'sub_class')
+for val in ['MSSubClass', 'OverallQual', 'OverallCond']:
+    sbn.scatterplot(x = val, y = 'SalePrice', data = df)
+    plt.show()
 
 '''
-Check correlation b/w OverallCond & OverallQual via chi-square
+We can see the minimum SalePrice increasing as we improve in quality, but no
+other immediate discernable pattern. Also isnt obvious how MSSubClass affects 
+sale price. Lets check correlation with Pearson chi-square
 helpful link: https://datascience.stackexchange.com/questions/893/how-to-get-correlation-between-two-categorical-variable-and-a-categorical-variab
-
 '''
 
 from scipy.stats import chi2_contingency
-for var in ['OverallCond', 'OverallQual']:
-    df[var] = df[var].astype('category')
-chi2, p, dof, ex = chi2_contingency(df[['OverallCond', 'OverallQual']])
+print('Chi-squared Tests')
+print('Null Hypothesis: pair-wise, the compared features are independent')
+for feature in ['MSSubClass', 'OverallQual', 'OverallCond']:
+    features = ['MSSubClass', 'OverallQual', 'OverallCond']
+    features.remove(feature)
+    p = chi2_contingency(pd.crosstab(df[features[0]], df[features[1]]))[1]
+    print('Features: ' + features[0] + ', ' + features[1] +
+          '\np-value: ' + str(p) + '\n')
+
+'''
+From the above we see strong pair-wise correlation between these categoricals.
+Lets include one of them at a time and evaluate our model:
+'''
+
+y = df['SalePrice']
+X = df.drop(columns = ['SalePrice'])
+
+
+
+#df = pd.get_dummies(df,columns = ['MSSubClass'], prefix = 'sub_class')
+
 
 
 
