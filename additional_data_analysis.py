@@ -48,27 +48,48 @@ def continuous_vars_prep(df, numeric_cols):
     'normalize'
     df = df.sample(frac = 1) #shuffle in case the data came in an ordered manner
     
-    numiadf
+    num_cols = list(df.columns)
     #merge the other cols back onto the dataframe
     drop_cols = [i for i in df.columns if i in df_first.columns]
     df_first.drop(columns = drop_cols, inplace = True)
     df = df.merge(df_first, right_index = True, left_index = True)
-    
-    return df
+    if numeric_cols:
+        return df, num_cols
+    else:
+        return df
 
 d1 =  pd.read_csv('data/train.csv').set_index('Id')
 d2 = pd.concat([pd.read_csv('data/test.csv').set_index('Id'),
                     pd.read_csv('data/sample_submission.csv').set_index('Id')],1)
-df = continuous_vars_prep(pd.concat([d1, d2]))
+df, numeric_cols = continuous_vars_prep(pd.concat([d1, d2]), True)
 
 '''
 Lets bring back the ordinal categoricals
 '''
 
 df = df.select_dtypes(exclude = ['object'])
+ordinals = [i for i in df.columns if i not in numeric_cols]
+print(df[ordinals].head())
+
+'Lets start with MSSubClass, OverallCond, and OverallQual which identifies the type of dwelling involved in the sale.'
+sbn.scatterplot(x = 'MSSubClass', y = 'SalePrice', data = df)
+plt.show()
+
+'''No immediate discernable pattern, and idk how this attribute affects housing 
+prices. OverallQual and OverallCond are  so just make each category its own indicator var'''
+df = pd.get_dummies(df,columns = ['MSSubClass'], prefix = 'sub_class')
+
+'''
+Check correlation b/w OverallCond & OverallQual via chi-square
+helpful link: https://datascience.stackexchange.com/questions/893/how-to-get-correlation-between-two-categorical-variable-and-a-categorical-variab
+
+'''
+
+from scipy.stats import chi2_contingency
+for var in ['OverallCond', 'OverallQual']:
+    df[var] = df[var].astype('category')
+chi2, p, dof, ex = chi2_contingency(df[['OverallCond', 'OverallQual']])
 
 
 
-
-                          
                           
