@@ -8,9 +8,8 @@ import pandas as pd
 import numpy as np
 import seaborn as sbn
 import matplotlib.pyplot as plt
-from scipy.stats import norm
-from scipy import stats
-from data_analysis import trim
+from data_analysis import trim, build_and_eval
+from copy import copy
 
 def continuous_vars_prep(df, numeric_cols):
     
@@ -76,8 +75,10 @@ ordinals = [i for i in df.columns if i not in numeric_cols]
 print(df[ordinals].head())
 
 'Lets start with MSSubClass, OverallCond, and OverallQual which identifies the type of dwelling involved in the sale.'
-for val in ['MSSubClass', 'OverallQual', 'OverallCond']:
-    sbn.scatterplot(x = val, y = 'SalePrice', data = df)
+categoricals = ['MSSubClass', 'OverallQual', 'OverallCond']
+for feature in categoricals:
+    df[feature] = df[feature].astype('str')
+    sbn.scatterplot(x = feature, y = 'SalePrice', data = df)
     plt.show()
 
 '''
@@ -89,9 +90,9 @@ helpful link: https://datascience.stackexchange.com/questions/893/how-to-get-cor
 
 from scipy.stats import chi2_contingency
 print('Chi-squared Tests')
-print('Null Hypothesis: pair-wise, the compared features are independent')
-for feature in ['MSSubClass', 'OverallQual', 'OverallCond']:
-    features = ['MSSubClass', 'OverallQual', 'OverallCond']
+print('Null Hypothesis: pair-wise, the compared features are independent\n')
+for feature in categoricals:
+    features = copy(categoricals)
     features.remove(feature)
     p = chi2_contingency(pd.crosstab(df[features[0]], df[features[1]]))[1]
     print('Features: ' + features[0] + ', ' + features[1] +
@@ -102,13 +103,23 @@ From the above we see strong pair-wise correlation between these categoricals.
 Lets include one of them at a time and evaluate our model:
 '''
 
+
 y = df['SalePrice']
-X = df.drop(columns = ['SalePrice'])
+X = df.drop(columns = (categoricals + ['SalePrice']) )
+X = (X - X.mean())/X.std()
 
+def rotate_in(feature, X, y):
+    X = X.merge(df[feature], right_index = True, left_index = True)
+    X = pd.get_dummies(X,columns = [feature], prefix = feature)
+    build_and_eval(X,y,'enumerating for feature ' + feature)
 
+for feature in categoricals:
+    rotate_in(feature,X,y)
 
-#df = pd.get_dummies(df,columns = ['MSSubClass'], prefix = 'sub_class')
-
+'Altogether now:'
+X = X.merge(df[categoricals], right_index = True, left_index = True)
+X = pd.get_dummies(X, columns = categoricals)
+build_and_eval(X,y)
 
 
 

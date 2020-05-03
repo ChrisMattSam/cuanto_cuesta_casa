@@ -11,6 +11,7 @@ import seaborn as sbn
 import matplotlib.pyplot as plt
 from scipy.stats import norm
 from scipy import stats
+import sklearn
 from sklearn import linear_model as lm
 from sklearn.model_selection import cross_validate as cv
 
@@ -60,7 +61,40 @@ def check_skew_kurtosis(df, feature = 'SalePrice', pics_only = False,):
     plt.show()
     print('The kurtosis: ' + str(stats.kurtosis(y)))
     print('The skew: ' + str(stats.skew(y)))
+
+def build_and_eval(X,y, extra = None, scorer = 'r2'):
+    '''
+    Taking a (normalized) X and its corresponding y, the function builds a 
+    multiple-regression model before attempting to regularize with ridge and
+    lasso.
+    '''
+    baseline = cv(lm.LinearRegression(fit_intercept = True), X, y, cv = 20,
+                      scoring = scorer, return_estimator = True)
     
+    if extra is None:
+        print('Multiple Regression:')
+    else:
+        print('Multiple Regression ' + extra + ':')
+    print('Largest R-squared: ' +  str(baseline['test_score'].max()) + '\n')
+    
+    # regularize
+    reg_vals = {'penalty':list(range(1,21)), 'Ridge':list(), 'Lasso':list() }
+    
+    for penalty in reg_vals['penalty']:
+        ridger = cv(lm.Ridge(alpha = penalty), X, y, scoring = scorer,cv = 10, return_estimator = True)
+        r = [ round(i,3) for i in ridger['test_score'] ]
+        reg_vals['Ridge'].append(max(r))
+    
+    for penalty in reg_vals['penalty']:
+        lasso = cv(lm.Lasso(alpha = penalty, max_iter = 50000), X, y, scoring = scorer,cv = 10, return_estimator = True)
+        r = [ round(i,3) for i in lasso['test_score']]
+        reg_vals['Lasso'].append(max(r))
+        
+    for val in ['Ridge', 'Lasso']:
+        v = min(reg_vals[val])
+        print(val + ' Regression:')
+        print('Smallest R-squared: '+ str(v) + ' for corresponding alpha = ' +
+              str( reg_vals['penalty'][reg_vals[val].index(v)]) + '\n')
 
 if __name__ == "__main__":
     'Initial outlier detection:'
@@ -161,37 +195,7 @@ if __name__ == "__main__":
     
     
     'Modelling:'
-    
-    def build_and_eval(X,y):
-        '''
-        Taking a (normalized) X and its corresponding y, the function builds a 
-        multiple-regression model before attempting to regularize with ridge and
-        lasso.
-        '''
-        baseline = cv(lm.LinearRegression(fit_intercept = True), X, y, cv = 20,
-                          scoring = 'r2', return_estimator = True)
-        
-        print('Multiple Regression:')
-        print('Largest R-squared: ' +  str(baseline['test_score'].max()) + '\n')
-        
-        # regularize
-        reg_vals = {'penalty':list(range(1,21)), 'Ridge':list(), 'Lasso':list() }
-        
-        for penalty in reg_vals['penalty']:
-            ridger = cv(lm.Ridge(alpha = penalty), X, y, scoring = 'r2',cv = 10, return_estimator = True)
-            r = [ round(i,3) for i in ridger['test_score'] ]
-            reg_vals['Ridge'].append(max(r))
-        
-        for penalty in reg_vals['penalty']:
-            lasso = cv(lm.Lasso(alpha = penalty, max_iter = 50000), X, y, scoring = 'r2',cv = 10, return_estimator = True)
-            r = [ round(i,3) for i in lasso['test_score']]
-            reg_vals['Lasso'].append(max(r))
-            
-        for val in ['Ridge', 'Lasso']:
-            v = max(reg_vals[val])
-            print(val + ' Regression:')
-            print('Largest R-squared: '+ str(v) + ' for corresponding alpha = ' +
-                  str( reg_vals['penalty'][reg_vals[val].index(v)]) + '\n')
-        
-
-    build_and_eval(X,y)
+    print('Possible scores to choose from: ')
+    score_types = sorted(sklearn.metrics.SCORERS.keys())
+    [print(s) for s in score_types]
+    build_and_eval(X,y, scorer = 'neg_mean_squared_error')
