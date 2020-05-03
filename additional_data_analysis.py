@@ -121,6 +121,12 @@ X = X.merge(df[categoricals], right_index = True, left_index = True)
 X = pd.get_dummies(X, columns = categoricals)
 build_and_eval(X,y)
 
+'''
+Next steps: use the "predict" attribute of each model and plot against actual 
+values to visually observe what each model is doing; pick good variables to use
+as x-axis values
+'''
+
 
 
                           
