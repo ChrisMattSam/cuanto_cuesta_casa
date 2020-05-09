@@ -252,7 +252,14 @@ if __name__ == "__main__":
         x2['diff'] = x2.SalePrice - x2.pred_SalePrice
         sbn.regplot('SalePrice','diff', data = x2)
         plt.show()
-    absolute_diff(model_dict['Lasso'],X,df)        
+    absolute_diff(model_dict['Lasso'],X,df)
+    
+    '''
+    Next steps: alter the fxn above to generate two plots, one for diffs and one
+    for absolute diffs.  Type an explanation of potential next steps, integrate changes
+    from the chi-squared tests, then MOVE ON to random forests or some other
+    method.
+    '''
     #[absolute_diff(l,X,df) for l in model_dict['Lasso'][:3]]
     #[absolute_diff(l,X,df) for l in model_dict['Ridge'][:3]]
     #[absolute_diff(l,X,df) for l in model_dict['Normal'][:3]]    
