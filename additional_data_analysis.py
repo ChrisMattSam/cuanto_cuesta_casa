@@ -103,7 +103,6 @@ From the above we see strong pair-wise correlation between these categoricals.
 Lets include one of them at a time and evaluate our model:
 '''
 
-
 y = df['SalePrice']
 X = df.drop(columns = (categoricals + ['SalePrice']) )
 X = (X - X.mean())/X.std()

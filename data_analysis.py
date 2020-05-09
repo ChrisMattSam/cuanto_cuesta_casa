@@ -62,39 +62,82 @@ def check_skew_kurtosis(df, feature = 'SalePrice', pics_only = False,):
     print('The kurtosis: ' + str(stats.kurtosis(y)))
     print('The skew: ' + str(stats.skew(y)))
 
-def build_and_eval(X,y, extra = None, scorer = 'r2'):
+
+def score_options():
+    print('Possible scores to choose from: ')
+    score_types = sorted(sklearn.metrics.SCORERS.keys())
+    [print(s) for s in score_types]
+    
+
+def build_and_eval(X,y, extra = None, scorer = 'r2',get_max = True,
+                   return_models = False, return_optimal = False,
+                   score_options = False):
     '''
     Taking a (normalized) X and its corresponding y, the function builds a 
     multiple-regression model before attempting to regularize with ridge and
     lasso.
     '''
+    if score_options: score_options()
+    model_holder = {'Normal':[] ,'Ridge':[], 'Lasso':[]}
     baseline = cv(lm.LinearRegression(fit_intercept = True), X, y, cv = 20,
                       scoring = scorer, return_estimator = True)
-    
+    model_holder['Normal'] = baseline['estimator']
+    if get_max:
+        precurser = 'Largest ' + scorer + ': '
+    else:
+        precurser = 'Smallest ' + scorer + ': '
+        
     if extra is None:
         print('Multiple Regression:')
     else:
         print('Multiple Regression ' + extra + ':')
-    print('Largest R-squared: ' +  str(baseline['test_score'].max()) + '\n')
+    print(precurser +  str(baseline['test_score'].max()) + '\n')
     
     # regularize
     reg_vals = {'penalty':list(range(1,21)), 'Ridge':list(), 'Lasso':list() }
     
     for penalty in reg_vals['penalty']:
         ridger = cv(lm.Ridge(alpha = penalty), X, y, scoring = scorer,cv = 10, return_estimator = True)
-        r = [ round(i,3) for i in ridger['test_score'] ]
-        reg_vals['Ridge'].append(max(r))
-    
-    for penalty in reg_vals['penalty']:
         lasso = cv(lm.Lasso(alpha = penalty, max_iter = 50000), X, y, scoring = scorer,cv = 10, return_estimator = True)
-        r = [ round(i,3) for i in lasso['test_score']]
-        reg_vals['Lasso'].append(max(r))
         
+        #obtain the min/max score and the corresponding model
+        s,c = get_score_and_model(ridger['test_score'],ridger['estimator'], get_max = get_max)
+        reg_vals['Ridge'].append(round(s,3))
+        model_holder['Ridge'].append(c)
+        
+        s,c = get_score_and_model(lasso['test_score'], lasso['estimator'], get_max = get_max)
+        reg_vals['Lasso'].append(round(s,3))
+        model_holder['Lasso'].append(c)
+        
+    best_alpha = {'Ridge':0, 'Lasso':0} # use to obtain the best models based on scoring
     for val in ['Ridge', 'Lasso']:
         v = min(reg_vals[val])
         print(val + ' Regression:')
-        print('Smallest R-squared: '+ str(v) + ' for corresponding alpha = ' +
-              str( reg_vals['penalty'][reg_vals[val].index(v)]) + '\n')
+        best_alpha[val] = reg_vals['penalty'][reg_vals[val].index(v)] 
+        print(precurser + str(v) + ' for corresponding alpha = ' +
+              str(best_alpha[val]) + '\n')
+    
+    if return_optimal:
+        return_models = True
+        for val in ['Ridge', 'Lasso']:
+            model_holder[val] = [m for m in model_holder[val] if m.alpha == best_alpha[val]]
+    
+    if return_models:
+        return model_holder
+        
+def get_score_and_model(list_of_scores, list_of_models, get_max = True):
+    '''
+    Given a list of test scores and the corresponding list of models, 
+    obtain the min/max score and its corresponding model
+    '''
+    if get_max:
+        score_val = max(list_of_scores)
+    else:
+        score_val = min(list_of_scores)
+        
+    index_of_score = np.where(list_of_scores == score_val)[0][0] #[0][0] to get the value from the tuple
+    corresponding_model = list_of_models[index_of_score]
+    return score_val, corresponding_model
 
 if __name__ == "__main__":
     'Initial outlier detection:'
@@ -195,7 +238,24 @@ if __name__ == "__main__":
     
     
     'Modelling:'
-    print('Possible scores to choose from: ')
-    score_types = sorted(sklearn.metrics.SCORERS.keys())
-    [print(s) for s in score_types]
-    build_and_eval(X,y, scorer = 'neg_mean_squared_error')
+    model_dict = build_and_eval(X,y, scorer = 'neg_mean_squared_error',
+                                return_optimal = True)
+    
+
+    #lets look at the absolute residuals
+    def absolute_diff(model,X,df):
+        if type(model) is list:
+            model = model.pop()
+        y_eval = pd.Series(model.predict(X)).reindex(X.index)
+        y_eval.name = 'pred_SalePrice'
+        x2 = df.merge(y_eval, left_index = True, right_index = True)
+        x2['diff'] = x2.SalePrice - x2.pred_SalePrice
+        sbn.regplot('SalePrice','diff', data = x2)
+        plt.show()
+    absolute_diff(model_dict['Lasso'],X,df)        
+    #[absolute_diff(l,X,df) for l in model_dict['Lasso'][:3]]
+    #[absolute_diff(l,X,df) for l in model_dict['Ridge'][:3]]
+    #[absolute_diff(l,X,df) for l in model_dict['Normal'][:3]]    
+    
+    
+    
