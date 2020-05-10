@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import seaborn as sbn
 import matplotlib.pyplot as plt
+import data_analysis as da
 from data_analysis import trim, build_and_eval
 from copy import copy
 
@@ -102,24 +103,30 @@ for feature in categoricals:
 From the above we see strong pair-wise correlation between these categoricals.
 Lets include one of them at a time and evaluate our model:
 '''
-
 y = df['SalePrice']
 X = df.drop(columns = (categoricals + ['SalePrice']) )
+X.drop(inplace = True, columns = ['YearRemodAdd','months_since_sold'])
 X = (X - X.mean())/X.std()
+X = X.merge(df[['YearRemodAdd','months_since_sold']], left_index = True, right_index = True)
 
 def rotate_in(feature, X, y):
     X = X.merge(df[feature], right_index = True, left_index = True)
     X = pd.get_dummies(X,columns = [feature], prefix = feature)
-    build_and_eval(X,y,'enumerating for feature ' + feature)
+    return build_and_eval(X,y,'enumerating for feature ' + feature,
+                          return_optimal = True,
+                          scorer = 'neg_mean_squared_log_error')
 
+best_models = {el:0 for el in categoricals}
 for feature in categoricals:
-    rotate_in(feature,X,y)
-
+    best_models[feature] = rotate_in(feature,X,y)
+    
 'Altogether now:'
+best_models['all_3_categoricals'] = 0
 X = X.merge(df[categoricals], right_index = True, left_index = True)
 X = pd.get_dummies(X, columns = categoricals)
-build_and_eval(X,y)
-
+best_models['all_3_categoricals']= build_and_eval(X,y, return_optimal = True,
+                                                  scorer = 'neg_mean_squared_log_error')
+ 
 '''
 Next steps: use the "predict" attribute of each model and plot against actual 
 values to visually observe what each model is doing; pick good variables to use

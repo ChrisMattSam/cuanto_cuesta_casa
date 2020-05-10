@@ -71,7 +71,7 @@ def score_options():
 
 def build_and_eval(X,y, extra = None, scorer = 'r2',get_max = True,
                    return_models = False, return_optimal = False,
-                   score_options = False):
+                   score_options = False, omni_seed = 8):
     '''
     Taking a (normalized) X and its corresponding y, the function builds a 
     multiple-regression model before attempting to regularize with ridge and
@@ -97,8 +97,10 @@ def build_and_eval(X,y, extra = None, scorer = 'r2',get_max = True,
     reg_vals = {'penalty':list(range(1,21)), 'Ridge':list(), 'Lasso':list() }
     
     for penalty in reg_vals['penalty']:
-        ridger = cv(lm.Ridge(alpha = penalty), X, y, scoring = scorer,cv = 10, return_estimator = True)
-        lasso = cv(lm.Lasso(alpha = penalty, max_iter = 50000), X, y, scoring = scorer,cv = 10, return_estimator = True)
+        ridger = cv(lm.Ridge(alpha = penalty, random_state = omni_seed), X, y, scoring = scorer,
+                    cv = 10, return_estimator = True)
+        lasso = cv(lm.Lasso(alpha = penalty, max_iter = 50000, random_state = omni_seed), X, y, scoring = scorer,
+                   cv = 10, return_estimator = True)
         
         #obtain the min/max score and the corresponding model
         s,c = get_score_and_model(ridger['test_score'],ridger['estimator'], get_max = get_max)
@@ -138,6 +140,26 @@ def get_score_and_model(list_of_scores, list_of_models, get_max = True):
     index_of_score = np.where(list_of_scores == score_val)[0][0] #[0][0] to get the value from the tuple
     corresponding_model = list_of_models[index_of_score]
     return score_val, corresponding_model
+
+def absolute_diff(model,X,df, preamble = None):
+    ''' 
+    Predicts SalePrice feature and plots residuals and absolute residuals 
+    against true SalePrice values
+    '''
+    if type(model) is list:
+        model = model[0]
+    y_eval = pd.Series(model.predict(X)).reindex(X.index)
+    y_eval.name = 'pred_SalePrice'
+    x2 = df.merge(y_eval, left_index = True, right_index = True)
+    x2['resid'] = x2.SalePrice - x2.pred_SalePrice
+    addendum = ''
+    if preamble is not None:
+        addendum = ': ' + preamble
+    sbn.regplot('SalePrice','resid', data = x2).set_title('Residual Plot' + addendum)
+    plt.show()
+    x2['abs_resid'] = abs(x2.resid)
+    sbn.regplot('SalePrice','abs_resid', data = x2).set_title('Absolute Residuals'+ addendum)
+    plt.show()
 
 if __name__ == "__main__":
     'Initial outlier detection:'
@@ -233,36 +255,20 @@ if __name__ == "__main__":
     'normalize'
     df = df.sample(frac = 1) #shuffle in case the data came in an ordered manner
     X = df.drop(columns = ['SalePrice','log_SalePrice'])
+    #drop time columns that dont need normalization, attach them after normalizing
+    X.drop(inplace = True, columns = ['YearBuilt','YearRemodAdd','months_since_sold'])
     X = (X - X.mean())/X.std()
+    X = X.merge(df[['YearBuilt','YearRemodAdd','months_since_sold']], left_index = True, right_index = True)
     y = df['SalePrice']
-    
     
     'Modelling:'
     model_dict = build_and_eval(X,y, scorer = 'neg_mean_squared_error',
                                 return_optimal = True)
     
-
-    #lets look at the absolute residuals
-    def absolute_diff(model,X,df):
-        if type(model) is list:
-            model = model.pop()
-        y_eval = pd.Series(model.predict(X)).reindex(X.index)
-        y_eval.name = 'pred_SalePrice'
-        x2 = df.merge(y_eval, left_index = True, right_index = True)
-        x2['diff'] = x2.SalePrice - x2.pred_SalePrice
-        sbn.regplot('SalePrice','diff', data = x2)
-        plt.show()
-    absolute_diff(model_dict['Lasso'],X,df)
-    
-    '''
-    Next steps: alter the fxn above to generate two plots, one for diffs and one
-    for absolute diffs.  Type an explanation of potential next steps, integrate changes
-    from the chi-squared tests, then MOVE ON to random forests or some other
-    method.
-    '''
-    #[absolute_diff(l,X,df) for l in model_dict['Lasso'][:3]]
-    #[absolute_diff(l,X,df) for l in model_dict['Ridge'][:3]]
-    #[absolute_diff(l,X,df) for l in model_dict['Normal'][:3]]    
+    #plot the result of one of those models against the dependent variable
+    absolute_diff(model_dict['Lasso'],X,df,'Lasso')
+    absolute_diff(model_dict['Ridge'],X,df,'Ridge')
+    absolute_diff(model_dict['Normal'][0],X,df,'Normal')
     
     
     
