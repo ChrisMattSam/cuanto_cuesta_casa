@@ -9,6 +9,8 @@ import pandas as pd
 import numpy as np
 import seaborn as sbn
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import figure
+
 from scipy.stats import norm
 from scipy import stats
 import sklearn
@@ -75,7 +77,10 @@ def build_and_eval(X,y, extra = None, scorer = 'r2',get_max = True,
     '''
     Taking a (normalized) X and its corresponding y, the function builds a 
     multiple-regression model before attempting to regularize with ridge and
-    lasso.
+    lasso. The function returns a dictionary of the models, specified by regu-
+    larizer (i.e. 'lasso', 'ridge', or 'normal'[no regularization performed]), 
+    with the option to return only the best-performing model of each regulari-
+    zation type
     '''
     if score_options: score_options()
     model_holder = {'Normal':[] ,'Ridge':[], 'Lasso':[]}
@@ -152,13 +157,20 @@ def absolute_diff(model,X,df, preamble = None):
     y_eval.name = 'pred_SalePrice'
     x2 = df.merge(y_eval, left_index = True, right_index = True)
     x2['resid'] = x2.SalePrice - x2.pred_SalePrice
+    x2['abs_resid'] = abs(x2.resid)
+    
     addendum = ''
     if preamble is not None:
         addendum = ': ' + preamble
+    
+    plt.subplots(figsize = (12,6))
+    plt.subplot(1,2,1)
     sbn.regplot('SalePrice','resid', data = x2).set_title('Residual Plot' + addendum)
-    plt.show()
-    x2['abs_resid'] = abs(x2.resid)
+    plt.ylabel('')
+    
+    plt.subplot(1,2,2)
     sbn.regplot('SalePrice','abs_resid', data = x2).set_title('Absolute Residuals'+ addendum)
+    plt.ylabel('')
     plt.show()
 
 if __name__ == "__main__":
