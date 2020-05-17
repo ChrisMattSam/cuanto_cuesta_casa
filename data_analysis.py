@@ -65,6 +65,9 @@ def check_skew_kurtosis(df, feature = 'SalePrice', pics_only = False,):
 
 
 def score_options():
+    '''
+    Return a list of possible scorers for a regression model
+    '''
     print('Possible scores to choose from: ')
     score_types = sorted(sklearn.metrics.SCORERS.keys())
     [print(s) for s in score_types]
