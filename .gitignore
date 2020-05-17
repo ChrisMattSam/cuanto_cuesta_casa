@@ -1,4 +1,3 @@
-*.csv
 .spyproject
 __pycache__/*
 .Rproj.user
