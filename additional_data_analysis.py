@@ -133,6 +133,7 @@ values to visually observe what each model is doing; pick good variables to use
 as x-axis values
 '''
 
-
+model_dict = best_models['all_3_categoricals']
+absolute_diff(model_dict['Lasso'],X,df,'Lasso')
 
                           
