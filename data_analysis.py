@@ -68,9 +68,11 @@ def score_options():
     '''
     Return a list of possible scorers for a regression model
     '''
+    from sklearn.metrics import SCORERS
+    score_types = sorted(SCORERS.keys())
     print('Possible scores to choose from: ')
-    score_types = sorted(sklearn.metrics.SCORERS.keys())
-    [print(s) for s in score_types]
+    for s in score_types:
+        print(s)
     
 
 def build_and_eval(X,y, extra = None, scorer = 'r2',get_max = True,
